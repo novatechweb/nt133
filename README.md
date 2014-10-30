@@ -1,4 +1,4 @@
-nt133
-=====
+usb_io
+======
 
-NovaTech USB Input/Output
+code for a usb device controlling inputs and outputs

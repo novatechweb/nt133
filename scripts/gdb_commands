@@ -1,0 +1,7 @@
+target extended-remote /dev/BlackMagicGDB
+mon jtag_scan
+attach 1
+load
+compare-sections
+q
+y
