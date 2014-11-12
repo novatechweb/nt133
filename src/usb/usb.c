@@ -149,11 +149,14 @@ static int get_io_control_callback(usbd_device *usbd_dev,
 	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
 	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
+	register uint16_t pin_state;
 	if (req->bRequest != IO_REQUEST) {
 		// not handling any other request other than IO_REQUEST
 		return USBD_REQ_NEXT_CALLBACK;
 	}
-	get_inputs(io_data_buffer);
+	pin_state = get_inputs();
+	io_data_buffer[0] = pin_state >> 8;
+	io_data_buffer[1] = pin_state & 0xFF;
 	*buf = io_data_buffer;
 	*len = IO_DATA_BUFF_LEN;
 

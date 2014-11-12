@@ -131,3 +131,13 @@ usb.legacy
 while true;do dd if=/dev/ntserusb0 bs=2 count=1 2>/dev/null | hexdump -C | grep -e '^00000000  ' -e '^*';done
 printf "\x1F" > /dev/ntserusb0
 '''
+
+'''
+prev = [0,0]
+while (True):
+    recieve = rcve_IO_vendor_control(data=2);
+    if recieve[0] is not prev[0] or recieve[1] is not prev[1]:
+        prev = recieve
+        print("0b{0:08b}, 0b{1:08b}".format(int(recieve[0]), int(recieve[1])))
+
+'''
