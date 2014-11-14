@@ -129,7 +129,7 @@ uint8_t usbd_control_buffer[128];
 // buffer used to send the values of the input ports back to the host
 uint8_t io_data_buffer[IO_DATA_BUFF_LEN];
 
-void usb_set_interrupt_data(uint16_t pin_state)
+uint16_t usb_set_interrupt_data(uint16_t pin_state)
 {
 	// NOTE:        interrupt_pending_buffer[]
 	// The first two bytes of interrupt_pending_buffer hold the state of input pins
@@ -142,7 +142,7 @@ void usb_set_interrupt_data(uint16_t pin_state)
 	interrupt_pending_buffer[0] = pin_state >> 8;
 	interrupt_pending_buffer[1] = pin_state & 0xFF;
 	// set the data to be sent
-	usbd_ep_write_packet(global_usb_dev_handle, EP_ADDR_INTERRUPT, interrupt_pending_buffer, EP_INTERRUPT_MAX_SIZE);
+	return usbd_ep_write_packet(global_usb_dev_handle, EP_ADDR_INTERRUPT, interrupt_pending_buffer, EP_INTERRUPT_MAX_SIZE);
 }
 
 static int get_io_control_callback(usbd_device *usbd_dev,

@@ -31,9 +31,10 @@ void io_poll(void)
 		}
 		// *** The port is not the same as previous poll ***
 		// Update the USB interrupt endpoint data
-		usb_set_interrupt_data(pin_state);
-		// store the port state
-		prev_pin_state = pin_state;
+		if (usb_set_interrupt_data(pin_state)) {
+			// store the port state
+			prev_pin_state = pin_state;
+		}
 	}
 }
 

@@ -5,7 +5,7 @@
 
 #include <io.h>
 
-void usb_set_interrupt_data(uint16_t pin_state);
+uint16_t usb_set_interrupt_data(uint16_t pin_state);
 void usb_reenumerate(void);
 
 #endif /* __CDCACM_H_ */
