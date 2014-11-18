@@ -20,6 +20,7 @@ SRC += \
 	platform/STM32F1/platform_STM32F1.c \
 	platform/STM32F1/platform_io.c \
 	platform/STM32F1/platform_i2c_led.c \
-	platform/STM32F1/platform_usb.c 
+	platform/STM32F1/platform_usb.c \
+	platform/STM32F1/platform_nt_timer.c 
 
 VPATH += platform/STM32F1/

@@ -12,7 +12,6 @@ else
 fi
 SCRIPT_DIR=${BASE_DIR}/scripts
 EXECUTABLE=nt133.elf
-printf "%s\n%s\n\n%s\n%s\n%s\n\n" "$(basename $(pwd))" "$(realpath $(pwd)/..)" "${BASE_DIR}" "${SCRIPT_DIR}" "${EXECUTABLE}"
 cd ${BASE_DIR}/src && \
     arm-cortexm3-eabi-gdb --command=${SCRIPT_DIR}/gdb_commands ${EXECUTABLE}
 cd ${BASE_DIR}

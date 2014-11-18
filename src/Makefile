@@ -35,13 +35,20 @@ LDFLAGS += \
 CFLAGS += -DBOOTLOADER
 LDFLAGS += -Wl,-Ttext=0x8002000 -Wl,--defsym,_stack=0x20005000
 
+# uncomment if debugging code should be included
+#CFLAGS += -DDEBUG
+
+# uncomment if assembly *.s file should be created
+#CFLAGS += -S
+
 Q := @
 # Program rules
 SUB_DIR = \
 	platform/$(PLATFORM) \
 	usb \
 	i2c_led \
-	io
+	io \
+	nt_timer
 
 include $(addsuffix /Makefile, $(SUB_DIR))
 
@@ -70,6 +77,7 @@ $(PROGRAM).elf: $(OBJ)
 
 clean:
 	-$(Q)$(RM) $(addsuffix /*.o, $(SUB_DIR) .)
+	-$(Q)$(RM) $(addsuffix /*.s, $(SUB_DIR) .)
 	-$(Q)$(RM) $(addsuffix /*.d, $(SUB_DIR) .)
 	-$(Q)$(RM) $(addsuffix /*.~, $(SUB_DIR) .)
 	-$(Q)$(RM) $(addsuffix /mapfile, $(SUB_DIR) .)

@@ -1,32 +1,14 @@
-#include "platform_STM32F1.h"
-#include "platform_io.h"
-#include "platform_i2c_led.h"
-#include "platform_usb.h"
-#include "platform.h"
-
 #include <stdint.h>
 
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/cm3/scb.h>
 
-/* Unused pins */
-#define UNUSED_PORTA_PIN1 GPIO1
-#define UNUSED_PORTA_PIN2 GPIO2
-#define UNUSED_PORTA_PIN3 GPIO3
-#define UNUSED_PORTA_PIN4 GPIO4
-#define UNUSED_PORTA_PIN5 GPIO5
-#define UNUSED_PORTA_PIN6 GPIO6
-#define UNUSED_PORTA_PIN7 GPIO7
-#define UNUSED_PORTA_PIN8 GPIO9
-#define UNUSED_PORTA_PIN9 GPIO10
-#define UNUSED_PORTB_PIN1 GPIO0
-#define UNUSED_PORTB_PIN2 GPIO1
-#define UNUSED_PORTB_PIN3 GPIO5
-#define UNUSED_PORTB_PIN4 GPIO6
-#define UNUSED_PORTB_PIN5 GPIO7
-#define UNUSED_PORTB_PIN6 GPIO8
-#define UNUSED_PORTB_PIN7 GPIO9
+#include "platform_STM32F1.h"
+#include "platform_i2c_led.h"
+#include "platform_io.h"
+#include "platform_nt_timer.h"
+#include "platform_usb.h"
 
 void platform_reset_hardware(void)
 {
@@ -41,6 +23,7 @@ void platform_reset_hardware(void)
 	io_reset_hardware();
 	usb_reset_hardware();
 	i2c_led_reset_hardware();
+	nt_timer_reset_hardware();
 }
 
 void platform_init(void)
@@ -89,14 +72,14 @@ void platform_init(void)
 			UNUSED_PORTA_PIN1 | UNUSED_PORTA_PIN2 | UNUSED_PORTA_PIN3 |
 			UNUSED_PORTA_PIN4 | UNUSED_PORTA_PIN5 | UNUSED_PORTA_PIN6 |
 			UNUSED_PORTA_PIN7 | UNUSED_PORTA_PIN8 | UNUSED_PORTA_PIN9);
-		gpio_set(GPIOA, UNUSED_PORTA_PIN1 | UNUSED_PORTA_PIN2 | UNUSED_PORTA_PIN3 |
+		gpio_clear(GPIOA, UNUSED_PORTA_PIN1 | UNUSED_PORTA_PIN2 | UNUSED_PORTA_PIN3 |
 			UNUSED_PORTA_PIN4 | UNUSED_PORTA_PIN5 | UNUSED_PORTA_PIN6 |
 			UNUSED_PORTA_PIN7 | UNUSED_PORTA_PIN8 | UNUSED_PORTA_PIN9);
 		gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_10_MHZ, GPIO_CNF_OUTPUT_PUSHPULL,
 			UNUSED_PORTB_PIN1 | UNUSED_PORTB_PIN2 | UNUSED_PORTB_PIN3 |
 			UNUSED_PORTB_PIN4 | UNUSED_PORTB_PIN5 | UNUSED_PORTB_PIN6 |
 			UNUSED_PORTB_PIN7);
-		gpio_set(GPIOB, UNUSED_PORTB_PIN1 | UNUSED_PORTB_PIN2 | UNUSED_PORTB_PIN3 |
+		gpio_clear(GPIOB, UNUSED_PORTB_PIN1 | UNUSED_PORTB_PIN2 | UNUSED_PORTB_PIN3 |
 			UNUSED_PORTB_PIN4 | UNUSED_PORTB_PIN5 | UNUSED_PORTB_PIN6 |
 			UNUSED_PORTB_PIN7);
 	}

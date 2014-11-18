@@ -1,13 +1,12 @@
-#include "i2c_led.h"
-
-#include <platform.h>
-#include <io.h>
-
 #include <stdint.h>
 
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/i2c.h>
+
+#include <platform.h>
+#include <io.h>
+#include "i2c_led.h"
 
 #define PCA8574D_7BIT_ADDRESS (0x40 >> 1)
 

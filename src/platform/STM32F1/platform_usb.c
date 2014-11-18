@@ -1,9 +1,9 @@
-#include "platform_usb.h"
-
 #include <stdint.h>
 
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
+
+#include "platform_usb.h"
 
 /* DFU/Boot1 */
 #define DFU_PORT GPIOB
@@ -19,13 +19,6 @@
 #define USB_ENUMERATE_PIN  GPIO8
 
 volatile uint32_t *unique_id_p = (volatile uint32_t *)0x1FFFF7E8;
-
-//void assert_boot_pin(void)
-//{
-//	// Set the DFU pin
-//	gpio_set_mode(DFU_PORT, GPIO_MODE_OUTPUT_2_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, DFU_PIN);
-//	gpio_clear(DFU_PORT, DFU_PIN);
-//}
 
 void usb_reset_hardware(void)
 {

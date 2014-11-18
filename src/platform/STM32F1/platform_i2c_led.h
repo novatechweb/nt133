@@ -1,8 +1,6 @@
 #ifndef __PLATFORM_I2C_LED_H_
 #define __PLATFORM_I2C_LED_H_
 
-#include <stdint.h>
-
 #define I2C_PORT I2C2
 #define I2C_SDA_PIN GPIO_I2C2_SDA
 #define I2C_SCL_PIN GPIO_I2C2_SCL

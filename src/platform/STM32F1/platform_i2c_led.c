@@ -1,6 +1,3 @@
-#include "platform_i2c_led.h"
-#include "platform.h"
-
 #include <stdint.h>
 
 #include <libopencm3/stm32/gpio.h>
@@ -9,6 +6,9 @@
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/i2c.h>
 #include <libopencm3/cm3/nvic.h>
+
+#include "platform_i2c_led.h"
+#include "../platform.h"
 
 void i2c_led_reset_hardware(void)
 {

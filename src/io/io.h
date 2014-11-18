@@ -3,16 +3,15 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <platform.h>
+
+#include <nt_timer.h>
 
 void io_init(void);
-void io_poll(void);
 void get_led_state(uint16_t *led_state);
-void set_outputs(bool output_enabled, uint8_t output_state);
-
-inline uint16_t get_inputs()
-{
-	return gpio_get(INPUT_PORT, GPIO_ALL);
-}
+uint16_t get_inputs();
+uint16_t relays_enabled();
+void enable_relays();
+void disable_relays();
+bool set_output(uint8_t output_index, bool enable, usec_time_t msec_time);
 
 #endif /* __IO_H_ */

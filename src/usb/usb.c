@@ -1,28 +1,3 @@
-/*
- * This file is part of the Black Magic Debug project.
- *
- * Copyright (C) 2011  Black Sphere Technologies Ltd.
- * Written by Gareth McMullin <gareth@blacksphere.co.nz>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include "usb.h"
-
-#include <io.h>
-#include <platform.h>
-
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -33,12 +8,17 @@
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/stm32/rcc.h>
 
+#include <platform.h>
+#include <io.h>
+#include "usb.h"
+
 #define BOARD_IDENT "NovaTech Input & Output ["BUILDDATE"]"
 #define INTERFACE_STRING "Input/Output control"
 
 #define SERIALNO_FLASH_LOCATION	0x8001ff0
 
 #define IO_REQUEST 0x5A
+#define OUTPUT_ENABLE_REQUEST 0xA5
 
 
 #define USB_1_0_STANDARD 0x0100
@@ -62,7 +42,7 @@ const struct usb_device_descriptor dev = {
 	.bDeviceSubClass = 0,
 	.bDeviceProtocol = 0,
 	.bMaxPacketSize0 = 64,
-//	.bMaxPacketSize0 = 8, // 8, 16, 32, 64
+ //	.bMaxPacketSize0 = 8, // 8, 16, 32, 64
 	.idVendor = NOVATECH_VENDOR_ID,
 	.idProduct = USB_PRODUCT_ID,
 	.bcdDevice = USB_BCD_VERSION_NUM,
@@ -122,6 +102,8 @@ static const char *usb_strings[] = {
 
 // Global handle to USB device data structure
 usbd_device * global_usb_dev_handle;
+// Global flag for the main loop to state that USB needs to be handled
+bool usb_interrupt_flag = false;
 
 // Buffer to be used for control requests.
 uint8_t usbd_control_buffer[128];
@@ -169,12 +151,52 @@ static int set_io_control_callback(usbd_device *usbd_dev,
 	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
 	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
+	uint32_t timeout;
+	uint8_t *buff = *buf;
+
 	if (req->bRequest != IO_REQUEST) {
 		// not handling any other request other than IO_REQUEST
 		return USBD_REQ_NEXT_CALLBACK;
 	}
-	// set the output ports
-	set_outputs((req->wValue & 0x10) ? true : false, (req->wValue & 0x0F));
+	if (!relays_enabled()) {
+		// not handling setting an output port without first enabiling the outputs
+		return USBD_REQ_NOTSUPP;
+	}
+	if ((req->wLength != 4) || (buf == NULL) || (*buf == NULL)) {
+		// not handling setting an output port without a timeout value
+		return USBD_REQ_NOTSUPP;
+	}
+
+	// calculate the timeout value from the data
+	timeout = (buff[0] * 16777216) + (buff[1] * 65536) + (buff[2] * 256) + buff[3];
+
+	// set the output and start the timer
+	if (set_output(req->wIndex, ((req->wValue == 0) ? false : true), timeout)) {
+		return USBD_REQ_HANDLED;
+	}
+
+	// error occured while trying to set the outputs
+	return USBD_REQ_NOTSUPP;
+	(void)usbd_dev;
+	(void)buf;
+	(void)len;
+	(void)complete;
+}
+
+static int set_output_enable(usbd_device *usbd_dev,
+	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
+	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+{
+	if (req->bRequest != OUTPUT_ENABLE_REQUEST) {
+		// not handling any other request other than IO_REQUEST
+		return USBD_REQ_NEXT_CALLBACK;
+	}
+
+	if (req->wValue == 0) {
+		disable_relays();
+	} else {
+		enable_relays();
+	}
 
 	return USBD_REQ_HANDLED;
 	(void)usbd_dev;
@@ -190,14 +212,21 @@ static void set_config(usbd_device *usbd_dev, uint16_t wValue)
 		USB_ENDPOINT_ATTR_INTERRUPT,
 		EP_INTERRUPT_MAX_SIZE,
 		NULL);
+	// IN controll message (sends data back to host)
 	usbd_register_control_callback(usbd_dev,
 		USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_IN,
 		USB_REQ_TYPE_DIRECTION | USB_REQ_TYPE_TYPE,
 		get_io_control_callback);
+	// OUT control message (recieves data from host)
 	usbd_register_control_callback(usbd_dev,
 		USB_REQ_TYPE_VENDOR,
 		USB_REQ_TYPE_DIRECTION | USB_REQ_TYPE_TYPE,
 		set_io_control_callback);
+	// OUT control message (recieves data from host)
+	usbd_register_control_callback(usbd_dev,
+		USB_REQ_TYPE_VENDOR,
+		USB_REQ_TYPE_DIRECTION | USB_REQ_TYPE_TYPE,
+		set_output_enable);
 	(void)wValue;
 }
 
@@ -208,13 +237,15 @@ void usb_reenumerate(void)
 	usb_reset_hardware();
 	// init USB hardware
 	usb_platform_init();
-	// set ISR priority
-	nvic_set_priority(USB_IRQ, IRQ_PRI_USB);
 	// Initilize the USB dev handle
 	global_usb_dev_handle = usbd_init(&USB_DRIVER, &dev,
 		&config, usb_strings, sizeof(usb_strings)/sizeof(char *),
 		usbd_control_buffer, sizeof(usbd_control_buffer));
 	usbd_register_set_config_callback(global_usb_dev_handle, set_config);
+	// specify there isn't any usb interrupts that need handaling
+	usb_interrupt_flag = false;
+	// set ISR priority
+	nvic_set_priority(USB_IRQ, IRQ_PRI_USB);
 	// enable interrupt
 	nvic_enable_irq(USB_IRQ);
 	// perform the re-enumerate steps
@@ -223,5 +254,22 @@ void usb_reenumerate(void)
 
 void USB_ISR(void)
 {
-	usbd_poll(global_usb_dev_handle);
+	// disable USB until the interrupt request has been handled
+	nvic_disable_irq(USB_IRQ);
+	// flag that there is at least one USB interrupt that needs handled
+	usb_interrupt_flag = true;
+}
+
+inline void poll_usb(void)
+{
+	while (usb_interrupt_flag) {
+		// USB interrupts are disabled
+		usbd_poll(global_usb_dev_handle);
+		// clear the flag
+		usb_interrupt_flag = false;
+		// enable USB interrupt again
+		nvic_enable_irq(USB_IRQ);
+		// the usb interrupt handler may be called here.
+		// This will set the flag and disable the USB interrupt once again
+	}
 }
