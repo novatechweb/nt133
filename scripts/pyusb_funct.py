@@ -2,10 +2,15 @@ import usb.core
 import usb.util
 import array
 
-IO_REQUEST = 0x5A
-OUTPUT_ENABLE_REQUEST = 0xA5
-idVendor=0x2AEB
-idProduct=133
+NT133_USB_REQ_INPUT_STATUS = 0x10
+NT133_USB_REQ_OUTPUT_STATUS  =0x11
+NT133_USB_REQ_OUTPUT_CTRL = 0x12
+NT133_USB_REQ_OUTPUT_ENABLE = 0x13
+
+idVendor = 0x2AEB
+idProduct = 133
+
+timeout = 1000
 
 def open_dev():
     dev = usb.core.find(idVendor=idVendor, idProduct=idProduct)
@@ -26,11 +31,11 @@ def enable_relays(wValue=False):
             usb.util.CTRL_OUT,
             usb.util.CTRL_TYPE_VENDOR,
             usb.util.CTRL_RECIPIENT_DEVICE),
-        bRequest=OUTPUT_ENABLE_REQUEST,
+        bRequest=NT133_USB_REQ_OUTPUT_ENABLE,
         wValue=wValue,
         wIndex=0,
         data_or_wLength=None,
-        timeout=1000)
+        timeout=timeout)
     return result
 
 def set_output(output_index, output_set=False, pulse_msec=0):
@@ -45,11 +50,11 @@ def set_output(output_index, output_set=False, pulse_msec=0):
             usb.util.CTRL_OUT,
             usb.util.CTRL_TYPE_VENDOR,
             usb.util.CTRL_RECIPIENT_DEVICE),
-        bRequest=IO_REQUEST,
+        bRequest=NT133_USB_REQ_OUTPUT_CTRL,
         wValue=output_set,
         wIndex=output_index,
         data_or_wLength=data,
-        timeout=1000)
+        timeout=timeout)
     return result
 
 def get_inputs():
@@ -58,12 +63,28 @@ def get_inputs():
             usb.util.CTRL_IN,
             usb.util.CTRL_TYPE_VENDOR,
             usb.util.CTRL_RECIPIENT_DEVICE),
-        bRequest=IO_REQUEST,
+        bRequest=NT133_USB_REQ_INPUT_STATUS,
         wValue=0,
         wIndex=0,
         data_or_wLength=2,
-        timeout=1000)
+        timeout=timeout)
     print("0b{0:08b}, 0b{1:08b}".format(int(result[0]), int(result[1])))
+    return result
+
+def get_timer(output_index):
+    result = dev.ctrl_transfer(
+        bmRequestType=usb.util.build_request_type(
+            usb.util.CTRL_IN,
+            usb.util.CTRL_TYPE_VENDOR,
+            usb.util.CTRL_RECIPIENT_DEVICE),
+        bRequest=NT133_USB_REQ_OUTPUT_STATUS,
+        wValue=0,
+        wIndex=output_index,
+        data_or_wLength=4,
+        timeout=timeout)
+    print(result)
+    result = (result[0] * 16777216) + (result[1] * 65536) + (result[2] * 256) + result[3];
+    print("milliseconds remaining on timer for output {0}: {1}".format(output_index, result))
     return result
 
 def get_interrupt(length=2):
@@ -80,7 +101,6 @@ def get_interrupt(length=2):
 
 
 dev.ctrl_transfer(bmRequestType=usb.util.build_request_type(usb.util.CTRL_IN, usb.util.CTRL_TYPE_STANDARD, usb.util.CTRL_RECIPIENT_DEVICE), bRequest=0x06, wIndex=0, data_or_wLength=20, wValue=(0x00|(0x01<<8)))
-dev.ctrl_transfer(bmRequestType=usb.util.build_request_type(usb.util.CTRL_IN, usb.util.CTRL_TYPE_VENDOR, usb.util.CTRL_RECIPIENT_DEVICE), bRequest=IO_REQUEST, wIndex=0, data_or_wLength=2, wValue=0x00)
 
 
 '''

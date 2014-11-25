@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <strings.h>
 
+#include <libopencm3/cm3/cortex.h>
 #include <libopencm3/stm32/gpio.h>
 
 #include <platform.h>
@@ -126,10 +127,30 @@ bool set_output(uint8_t output_index, bool enable, usec_time_t msec_time)
 	output[output_index].enable = !enable;
 	// resetup the timer if we have a time
 	if (msec_time != 0) {
-		// set the new timeout value
+		// set the new timeout value, converting milliseconds to 100's of microseconds
 		output_timers[output_index].tick_count = msec_time * 10;
 		// start the timer
 		add_timer(&(output_timers[output_index]));
 	}
 	return true;
+}
+
+usec_time_t get_timer_remaining(uint8_t output_index)
+{
+	usec_time_t time_remaining = 0;
+
+	if (output_index > NUM_OUTPUTS) {
+		// return an invalad number to indicate a failure
+		return 0xFFFFFFFF;
+	}
+
+	if (timer_started(&(output_timers[output_index]))) {
+		cm_disable_interrupts();
+		time_remaining = output_timers[output_index].tick_count;
+		cm_enable_interrupts();
+		// truncate to milliseconds
+		time_remaining = time_remaining / 10;
+	}
+
+	return time_remaining;
 }

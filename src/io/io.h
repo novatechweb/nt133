@@ -13,5 +13,6 @@ uint16_t relays_enabled();
 void enable_relays();
 void disable_relays();
 bool set_output(uint8_t output_index, bool enable, usec_time_t msec_time);
+usec_time_t get_timer_remaining(uint8_t output_index);
 
 #endif /* __IO_H_ */

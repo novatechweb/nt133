@@ -9,6 +9,7 @@
 #include <libopencm3/stm32/rcc.h>
 
 #include <platform.h>
+#include <nt_timer.h>
 #include <io.h>
 #include "usb.h"
 
@@ -17,22 +18,18 @@
 
 #define SERIALNO_FLASH_LOCATION	0x8001ff0
 
-#define IO_REQUEST 0x5A
-#define OUTPUT_ENABLE_REQUEST 0xA5
-
-
-#define USB_1_0_STANDARD 0x0100
-#define USB_1_1_STANDARD 0x0101
-#define USB_2_0_STANDARD 0x0200
+#define NT133_USB_REQ_INPUT_STATUS 0x10
+#define NT133_USB_REQ_OUTPUT_STATUS 0x11
+#define NT133_USB_REQ_OUTPUT_CTRL 0x12
+#define NT133_USB_REQ_OUTPUT_ENABLE 0x13
 
 #define INTERRUPT_EP_NUM 0x01
-#define EP_ADDR_IN  0x80
-#define EP_ADDR_OUT 0x00
 
 #define EP_ADDR_INTERRUPT (EP_ADDR_IN | (0x0F & INTERRUPT_EP_NUM))
 
-#define EP_INTERRUPT_MAX_SIZE 2
-#define IO_DATA_BUFF_LEN 2
+#define INTERRUPT_DATA_BUFF_LEN 2
+#define INPUTS_DATA_BUFF_LEN 2
+#define TIMER_REMAINING_DATA_BUFF_LEN 4
 
 const struct usb_device_descriptor dev = {
 	.bLength = USB_DT_DEVICE_SIZE,
@@ -57,7 +54,7 @@ static const struct usb_endpoint_descriptor interrupt_endp[] = {{
 	.bDescriptorType = USB_DT_ENDPOINT,
 	.bEndpointAddress = EP_ADDR_INTERRUPT,
 	.bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
-	.wMaxPacketSize = EP_INTERRUPT_MAX_SIZE,
+	.wMaxPacketSize = INTERRUPT_DATA_BUFF_LEN,
 	.bInterval = 1,
 }};
 
@@ -102,14 +99,18 @@ static const char *usb_strings[] = {
 
 // Global handle to USB device data structure
 usbd_device * global_usb_dev_handle;
+
 // Global flag for the main loop to state that USB needs to be handled
 bool usb_interrupt_flag = false;
 
+// ***  USB Message Buffers  ***
 // Buffer to be used for control requests.
 uint8_t usbd_control_buffer[128];
-
 // buffer used to send the values of the input ports back to the host
-uint8_t io_data_buffer[IO_DATA_BUFF_LEN];
+uint8_t inputs_data_buffer[INPUTS_DATA_BUFF_LEN];
+// buffer used to send the values of the input ports back to the host
+uint8_t timer_remaining_data_buffer[TIMER_REMAINING_DATA_BUFF_LEN];
+
 
 uint16_t usb_set_interrupt_data(uint16_t pin_state)
 {
@@ -119,43 +120,43 @@ uint16_t usb_set_interrupt_data(uint16_t pin_state)
 	//   interrupt_pending_buffer[1] == input pins 08, 07 ,06 ,05 ,04 ,03 ,02 ,01
 
 	// buffer holding the data for interrupt endpoint
-	uint8_t interrupt_pending_buffer[EP_INTERRUPT_MAX_SIZE];
+	uint8_t interrupt_pending_buffer[INTERRUPT_DATA_BUFF_LEN];
 	// store the current state of the pins
 	interrupt_pending_buffer[0] = pin_state >> 8;
 	interrupt_pending_buffer[1] = pin_state & 0xFF;
 	// set the data to be sent
-	return usbd_ep_write_packet(global_usb_dev_handle, EP_ADDR_INTERRUPT, interrupt_pending_buffer, EP_INTERRUPT_MAX_SIZE);
+	return usbd_ep_write_packet(global_usb_dev_handle, EP_ADDR_INTERRUPT, interrupt_pending_buffer, INTERRUPT_DATA_BUFF_LEN);
 }
 
-static int get_io_control_callback(usbd_device *usbd_dev,
+static int get_inputs_control_callback(usbd_device *usbd_dev,
 	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
 	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
 	register uint16_t pin_state;
-	if (req->bRequest != IO_REQUEST) {
-		// not handling any other request other than IO_REQUEST
+	if (req->bRequest != NT133_USB_REQ_INPUT_STATUS) {
+		// not handling any other request other than NT133_USB_REQ_INPUT_STATUS
 		return USBD_REQ_NEXT_CALLBACK;
 	}
 	pin_state = get_inputs();
-	io_data_buffer[0] = pin_state >> 8;
-	io_data_buffer[1] = pin_state & 0xFF;
-	*buf = io_data_buffer;
-	*len = IO_DATA_BUFF_LEN;
+	inputs_data_buffer[0] = pin_state >> 8;
+	inputs_data_buffer[1] = pin_state & 0xFF;
+	*buf = inputs_data_buffer;
+	*len = INPUTS_DATA_BUFF_LEN;
 
 	return USBD_REQ_HANDLED;
 	(void)usbd_dev;
 	(void)complete;
 }
 
-static int set_io_control_callback(usbd_device *usbd_dev,
+static int set_output_control_callback(usbd_device *usbd_dev,
 	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
 	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
 	uint32_t timeout;
 	uint8_t *buff = *buf;
 
-	if (req->bRequest != IO_REQUEST) {
-		// not handling any other request other than IO_REQUEST
+	if (req->bRequest != NT133_USB_REQ_OUTPUT_CTRL) {
+		// not handling any other request other than NT133_USB_REQ_OUTPUT_CTRL
 		return USBD_REQ_NEXT_CALLBACK;
 	}
 	if (!relays_enabled()) {
@@ -183,12 +184,41 @@ static int set_io_control_callback(usbd_device *usbd_dev,
 	(void)complete;
 }
 
-static int set_output_enable(usbd_device *usbd_dev,
+static int get_output_timer_control_callback(usbd_device *usbd_dev,
 	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
 	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
-	if (req->bRequest != OUTPUT_ENABLE_REQUEST) {
-		// not handling any other request other than IO_REQUEST
+	usec_time_t timer_remaining;
+	if (req->bRequest != NT133_USB_REQ_OUTPUT_STATUS) {
+		// not handling any other request other than NT133_USB_REQ_OUTPUT_STATUS
+		return USBD_REQ_NEXT_CALLBACK;
+	}
+	timer_remaining = get_timer_remaining(req->wIndex);
+	if (timer_remaining > 0x1FFFFFFF) {
+		// an invalid time was returned
+		return USBD_REQ_NOTSUPP;
+	}
+
+	timer_remaining_data_buffer[0] = (uint8_t)(timer_remaining >> 24);
+	timer_remaining_data_buffer[1] = (uint8_t)(timer_remaining >> 16);
+	timer_remaining_data_buffer[2] = (uint8_t)(timer_remaining >>  8);
+	timer_remaining_data_buffer[3] = (uint8_t)(timer_remaining >>  0);
+	*buf = timer_remaining_data_buffer;
+	*len = TIMER_REMAINING_DATA_BUFF_LEN;
+
+	return USBD_REQ_HANDLED;
+	(void)usbd_dev;
+	(void)buf;
+	(void)len;
+	(void)complete;
+}
+
+static int set_output_enable_control_callback(usbd_device *usbd_dev,
+	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
+	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+{
+	if (req->bRequest != NT133_USB_REQ_OUTPUT_ENABLE) {
+		// not handling any other request other than NT133_USB_REQ_OUTPUT_ENABLE
 		return USBD_REQ_NEXT_CALLBACK;
 	}
 
@@ -210,23 +240,28 @@ static void set_config(usbd_device *usbd_dev, uint16_t wValue)
 	usbd_ep_setup(usbd_dev,
 		EP_ADDR_INTERRUPT,
 		USB_ENDPOINT_ATTR_INTERRUPT,
-		EP_INTERRUPT_MAX_SIZE,
+		INTERRUPT_DATA_BUFF_LEN,
 		NULL);
 	// IN controll message (sends data back to host)
 	usbd_register_control_callback(usbd_dev,
 		USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_IN,
 		USB_REQ_TYPE_DIRECTION | USB_REQ_TYPE_TYPE,
-		get_io_control_callback);
+		get_inputs_control_callback);
 	// OUT control message (recieves data from host)
 	usbd_register_control_callback(usbd_dev,
 		USB_REQ_TYPE_VENDOR,
 		USB_REQ_TYPE_DIRECTION | USB_REQ_TYPE_TYPE,
-		set_io_control_callback);
+		set_output_control_callback);
+	// IN controll message (sends data back to host)
+	usbd_register_control_callback(usbd_dev,
+		USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_IN,
+		USB_REQ_TYPE_DIRECTION | USB_REQ_TYPE_TYPE,
+		get_output_timer_control_callback);
 	// OUT control message (recieves data from host)
 	usbd_register_control_callback(usbd_dev,
 		USB_REQ_TYPE_VENDOR,
 		USB_REQ_TYPE_DIRECTION | USB_REQ_TYPE_TYPE,
-		set_output_enable);
+		set_output_enable_control_callback);
 	(void)wValue;
 }
 
