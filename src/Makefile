@@ -5,6 +5,7 @@ VERSION_MINOR := 0x01
 
 CC = $(CROSS_COMPILE)gcc
 OBJCOPY = $(CROSS_COMPILE)objcopy
+OBJDUMP = $(CROSS_COMPILE)objdump
 
 CFLAGS += \
 	-O2 \
@@ -38,9 +39,6 @@ LDFLAGS += -Wl,-Ttext=0x8002000 -Wl,--defsym,_stack=0x20005000
 # uncomment if debugging code should be included
 #CFLAGS += -DDEBUG
 
-# uncomment if assembly *.s file should be created
-#CFLAGS += -S
-
 Q := @
 # Program rules
 SUB_DIR = \
@@ -57,7 +55,10 @@ SRC += \
 
 OBJ = $(SRC:.c=.o)
 
-all: $(PROGRAM).bin $(PROGRAM).hex
+# Uncomment the next line to generate assembly from the objects
+#DISASM += $(SRC:.c=.dis)
+
+all: $(PROGRAM).bin $(PROGRAM).hex $(DISASM)
 
 gdb: $(PROGRAM).elf
 	cgdb -d arm-cortexm3-eabi-gdb $^
@@ -75,9 +76,13 @@ $(PROGRAM).elf: $(OBJ)
 	@printf '  %s  -->  %s\n' "$^" "$@"
 	$(Q)$(CC) -o $@ $^ $(LDFLAGS)
 
+%.dis: %.o
+	@printf '  %s  -->  %s\n' "$^" "$@"
+	$(Q)$(OBJDUMP) -l -S $^ > $@
+
 clean:
 	-$(Q)$(RM) $(addsuffix /*.o, $(SUB_DIR) .)
-	-$(Q)$(RM) $(addsuffix /*.s, $(SUB_DIR) .)
+	-$(Q)$(RM) $(addsuffix /*.dis, $(SUB_DIR) .)
 	-$(Q)$(RM) $(addsuffix /*.d, $(SUB_DIR) .)
 	-$(Q)$(RM) $(addsuffix /*.~, $(SUB_DIR) .)
 	-$(Q)$(RM) $(addsuffix /mapfile, $(SUB_DIR) .)
