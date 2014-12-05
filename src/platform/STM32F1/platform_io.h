@@ -3,8 +3,6 @@
 
 #include <libopencm3/stm32/gpio.h>
 
-#define I2C_PORT I2C2
-
 #define INPUT_PORT GPIOC
 
 #define INPUT_PORT_PIN1 GPIO0
