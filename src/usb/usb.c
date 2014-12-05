@@ -128,9 +128,9 @@ uint16_t usb_set_interrupt_data(uint16_t pin_state)
 	return usbd_ep_write_packet(global_usb_dev_handle, EP_ADDR_INTERRUPT, interrupt_pending_buffer, INTERRUPT_DATA_BUFF_LEN);
 }
 
-static int get_inputs_control_callback(usbd_device *usbd_dev,
+static int get_inputs_control_callback(usbd_device * UNUSED(usbd_dev),
 	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
-	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req) __attribute__((unused)))
 {
 	register uint16_t pin_state;
 	if (req->bRequest != NT133_USB_REQ_INPUT_STATUS) {
@@ -144,13 +144,11 @@ static int get_inputs_control_callback(usbd_device *usbd_dev,
 	*len = INPUTS_DATA_BUFF_LEN;
 
 	return USBD_REQ_HANDLED;
-	(void)usbd_dev;
-	(void)complete;
 }
 
-static int set_output_control_callback(usbd_device *usbd_dev,
-	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
-	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+static int set_output_control_callback(usbd_device * UNUSED(usbd_dev),
+	struct usb_setup_data *req, uint8_t **buf, uint16_t * UNUSED(len),
+	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req) __attribute__((unused)))
 {
 	uint32_t timeout;
 	uint8_t *buff = *buf;
@@ -178,15 +176,11 @@ static int set_output_control_callback(usbd_device *usbd_dev,
 
 	// error occured while trying to set the outputs
 	return USBD_REQ_NOTSUPP;
-	(void)usbd_dev;
-	(void)buf;
-	(void)len;
-	(void)complete;
 }
 
-static int get_output_timer_control_callback(usbd_device *usbd_dev,
+static int get_output_timer_control_callback(usbd_device * UNUSED(usbd_dev),
 	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
-	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req) __attribute__((unused)))
 {
 	usec_time_t timer_remaining;
 	if (req->bRequest != NT133_USB_REQ_OUTPUT_STATUS) {
@@ -207,15 +201,11 @@ static int get_output_timer_control_callback(usbd_device *usbd_dev,
 	*len = TIMER_REMAINING_DATA_BUFF_LEN;
 
 	return USBD_REQ_HANDLED;
-	(void)usbd_dev;
-	(void)buf;
-	(void)len;
-	(void)complete;
 }
 
-static int set_output_enable_control_callback(usbd_device *usbd_dev,
-	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
-	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+static int set_output_enable_control_callback(usbd_device * UNUSED(usbd_dev),
+	struct usb_setup_data *req, uint8_t ** UNUSED(buf), uint16_t * UNUSED(len),
+	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req) __attribute__((unused)))
 {
 	if (req->bRequest != NT133_USB_REQ_OUTPUT_ENABLE) {
 		// not handling any other request other than NT133_USB_REQ_OUTPUT_ENABLE
@@ -229,13 +219,9 @@ static int set_output_enable_control_callback(usbd_device *usbd_dev,
 	}
 
 	return USBD_REQ_HANDLED;
-	(void)usbd_dev;
-	(void)buf;
-	(void)len;
-	(void)complete;
 }
 
-static void set_config(usbd_device *usbd_dev, uint16_t wValue)
+static void set_config(usbd_device *usbd_dev, uint16_t UNUSED(wValue))
 {
 	usbd_ep_setup(usbd_dev,
 		EP_ADDR_INTERRUPT,
@@ -262,7 +248,6 @@ static void set_config(usbd_device *usbd_dev, uint16_t wValue)
 		USB_REQ_TYPE_VENDOR,
 		USB_REQ_TYPE_DIRECTION | USB_REQ_TYPE_TYPE,
 		set_output_enable_control_callback);
-	(void)wValue;
 }
 
 void usb_reenumerate(void)

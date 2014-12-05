@@ -12,7 +12,7 @@
 #include "nt_timer/nt_timer.h"
 #include "usb/usb.h"
 
-int main(int argc, char **argv)
+int main(int UNUSED(argc), char **UNUSED(argv))
 {
 	uint16_t pin_state = get_inputs();
 	uint16_t prev_pin_state = pin_state;
@@ -57,6 +57,4 @@ int main(int argc, char **argv)
 
 	/* Should never get here */
 	return EXIT_SUCCESS;
-	(void) argc;
-	(void) argv;
 }

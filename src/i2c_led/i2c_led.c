@@ -78,7 +78,6 @@ void SYSTICK_IRQ(void)
 void I2C_EVENT_IRQ(void)
 {
 	uint32_t reg32_sr1;
-	uint32_t reg32_sr2 __attribute__((unused));
 	uint8_t data;
 
 	// read Status Register
