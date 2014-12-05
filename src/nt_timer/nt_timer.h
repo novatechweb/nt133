@@ -12,26 +12,26 @@ typedef uint32_t usec_time_t;
 // timer handle
 // stores all the information about the timer
 struct timer_handle_t {
-	// Set when the handler is first created (INIT_TIMER_HANDLE())
-	// Read is only intended in run_timer_events()
+	// a function to be called after the timer expires
 	void (*callback_funct)(struct timer_handle_t *);
 
-	// pointer to data use by the timer
+	// pointer to data use by the timer callback function.
 	void *timer_data;
 
-	// This variable needs to have global interrupts disabled when reading and
-	// writing to it and when it's handler is in the list
+	// ***  For the following three varaibles  ***
+	// Used in the nt_timer Interrupt Service Routine, therefore
+	// must be accessed atomicly (disable global interrupts).
+	// reload_val, and timeout_flag can be changed atomicly in other ISRs.
+	// tick_count can only be changed by nt_timer ISR.
+
+	// Value the timer will be reloaded to after it expires.
 	usec_time_t reload_val;
-
-	// Set when the handler is first created (INIT_TIMER_HANDLE()),
-	//   and after callback_funct in run_timer_events()
-	// Read is only intended in ISR, and run_timer_events()
+	// The current count of the timer. Increments timeout_flag when 0.
+	//   ***  Do not change value once timer is active  ***
 	usec_time_t tick_count;
-
-	// Set when the handler is first created (INIT_TIMER_HANDLE()),
-	//   in the ISR, and after callback_funct in run_timer_events()
-	// Can be read anywhere as long as disable global INT around access
-	unsigned short timeout_flag;
+	// The number of times the timer has expired and not been handled.
+	// The timer is expired when not zero.
+	uint8_t timeout_flag;
 };
 
 

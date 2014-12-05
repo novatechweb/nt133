@@ -47,22 +47,18 @@ void NT_TIMER_IRQ(void)
 			// Timer is not allocated. skip to next
 			continue;
 		}
-		if (timer_list[timer_index]->tick_count != 0) {
-			// decrement the tick_count
-			timer_list[timer_index]->tick_count--;
-		} else {
-			// timer has expired
+		if (timer_list[timer_index]->tick_count == 0) {
+			// This timer has already expired, but has not been handled
+			continue;
+		}
+		// decrement the tick_count
+		timer_list[timer_index]->tick_count--;
+		if (timer_list[timer_index]->tick_count == 0) {
 			cm_disable_interrupts();
-			if (timer_list[timer_index]->reload_val == 0) {
-				// This timer has timed out
-				// set flag to 1 until handle is removed from timer_list
-				timer_list[timer_index]->timeout_flag = 1;
-			} else {
-				// reload this timer
-				timer_list[timer_index]->tick_count = timer_list[timer_index]->reload_val;
-				// This timer has timed out
-				timer_list[timer_index]->timeout_flag++;
-			}
+			// This timer has timed out
+			timer_list[timer_index]->timeout_flag++;
+			// reload the timer
+			timer_list[timer_index]->tick_count = timer_list[timer_index]->reload_val;
 			cm_enable_interrupts();
 		}
 	}
@@ -84,35 +80,42 @@ void run_timer_event(void)
 {
 	// keep track of which index in timer_list to service next
 	static uint8_t cur_list_index = (MAX_TIMERS - 1);
-
-	usec_time_t tick_count;
-	void (*callback_funct)(struct timer_handle_t *);
+	struct timer_handle_t * cur_timer_handle;
 
 	// Increment to the next timer handle
-	cur_list_index = (cur_list_index + 1) % MAX_TIMERS;
-	DISABLE_NT_TIMER_INT();
-	tick_count = timer_list[cur_list_index]->tick_count;
-	callback_funct = timer_list[cur_list_index]->callback_funct;
-	ENABLE_NT_TIMER_INT();
-	if (timer_list[cur_list_index] == NULL) {
+	cur_list_index++; if (cur_list_index == MAX_TIMERS) { cur_list_index = 0; }
+	// There seems to be issues with % operation.
+	// cur_list_index = (cur_list_index + 1) % MAX_TIMERS;
+
+	cur_timer_handle = timer_list[cur_list_index];
+
+	// is there an active timer at this index
+	if (cur_timer_handle == NULL) {
 		// Timer is not allocated. skip to next
 		return;
 	}
-	if (tick_count != 0) {
-		// this timer has not expired
-		return;
-	}
-	if (callback_funct != NULL) {
-		callback_funct(timer_list[cur_list_index]);
-	}
+
 	cm_disable_interrupts();
-	// We have handled the call for this timer handle
-	timer_list[cur_list_index]->timeout_flag--;
-	if (timer_list[cur_list_index]->reload_val == 0) {
-		// remove the timer
-		timer_list[cur_list_index] = NULL;
+	if (cur_timer_handle->timeout_flag != 0) {
+		// ***  Need to handle this timer  ***
+		// decrement the number of times this timer has expired
+		cur_timer_handle->timeout_flag--;
+		if ((cur_timer_handle->tick_count == 0) &&
+			(cur_timer_handle->timeout_flag == 0)) {
+			// The timer is not currently running and the timeout_flag has
+			// been handled the apropriate number of times, therefore
+			// automatically remove the timer handle.
+			timer_list[cur_list_index] = NULL;
+		}
+		cm_enable_interrupts();
+		if (cur_timer_handle->callback_funct != NULL) {
+			// run the callback function
+			cur_timer_handle->callback_funct(cur_timer_handle);
+		}
+	} else {
+		// the timer has not expired
+		cm_enable_interrupts();
 	}
-	cm_enable_interrupts();
 }
 
 // ***************************************************************************
