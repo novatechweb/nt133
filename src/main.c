@@ -14,8 +14,8 @@
 
 int main(int UNUSED(argc), char **UNUSED(argv))
 {
-	uint16_t pin_state = get_inputs();
-	uint16_t prev_pin_state = pin_state;
+	uint16_t pin_state;
+	uint16_t prev_pin_state;
 
 	// Make certain the hardware is back at reset state
 	platform_reset_hardware();
@@ -26,8 +26,11 @@ int main(int UNUSED(argc), char **UNUSED(argv))
 	// initilize each module in order
 	platform_init();
 	io_init();
-	i2c_led_init();
 	initialize_timer();
+	i2c_led_init();
+
+	pin_state = get_inputs();
+	prev_pin_state = pin_state;
 
 	// enable interrupts
 	cm_enable_interrupts();

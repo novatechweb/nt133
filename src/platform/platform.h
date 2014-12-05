@@ -22,7 +22,7 @@
 #define USB_PRODUCT_ID 133
 #define USB_BCD_VERSION_NUM ((VERSION_MAJOR << 8) | VERSION_MINOR)
 
-#define MAX_TIMERS 4
+#define MAX_TIMERS 5
 
 #ifdef STM32F1
   #include "platform/STM32F1/platform_STM32F1.h"

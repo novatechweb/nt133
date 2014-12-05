@@ -7,8 +7,9 @@
 #include <nt_timer.h>
 
 void io_init(void);
-void get_led_state(uint16_t *led_state);
+void get_led_data(uint32_t *led_data);
 uint16_t get_inputs();
+uint16_t get_outputs();
 uint16_t relays_enabled();
 void enable_relays();
 void disable_relays();

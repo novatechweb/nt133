@@ -3,6 +3,7 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/i2c.h>
+#include <libopencm3/stm32/dma.h>
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/cm3/nvic.h>
@@ -20,7 +21,6 @@ enum I2C_FREQ {
 void i2c_led_reset_hardware(void)
 {
 	i2c_reset(I2C_PORT);
-	systick_clear();
 }
 
 void reset_i2c_pins(void)
@@ -50,17 +50,34 @@ static void setup_i2c_port(enum I2C_FREQ I2C_speed)
 {
 	// Disable I2C if it happens to be enabled
 	i2c_peripheral_disable(I2C_PORT);
+	dma_channel_reset(I2C_TX_DMA, I2C_TX_DMA_CHANNEL);
 	i2c_disable_interrupt(I2C_PORT, (I2C_CR2_ITEVTEN | I2C_CR2_ITERREN));
-	// make certain interrupts are disabled
-	nvic_disable_irq(I2C_EV_IRQ);
-	nvic_disable_irq(I2C_ER_IRQ);
-
+	DISABLE_I2C_INTERRUPT();
 	reset_i2c_pins();
+
+	// set: Source, Destination, and Amount (DMA channel must be disabled)
+	dma_set_peripheral_address(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, (uint32_t)&I2C_DR(I2C_PORT));
+	dma_set_memory_address(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, 0);
+	dma_set_number_of_data(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, 0);
+	// set the DMA Configuration (DMA_CCRx)
+	//			 (BIT 14) mem2mem_mode disabled
+	dma_set_priority(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, DMA_CCR_PL_HIGH); // (BIT 12:13)
+	dma_set_memory_size(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, DMA_CCR_MSIZE_8BIT); // (BIT 10:11)
+	dma_set_peripheral_size(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, DMA_CCR_PSIZE_8BIT); // (BIT 8:9)
+	dma_enable_memory_increment_mode(I2C_TX_DMA, I2C_TX_DMA_CHANNEL); // (BIT 7)
+	dma_disable_peripheral_increment_mode(I2C_TX_DMA, I2C_TX_DMA_CHANNEL); // (BIT 6)
+	//			 (BIT 5) Circular mode is disabled
+	dma_set_read_from_memory(I2C_TX_DMA, I2C_TX_DMA_CHANNEL);	// (BIT 4)
+	dma_enable_transfer_error_interrupt(I2C_TX_DMA, I2C_TX_DMA_CHANNEL); // (BIT 3)
+	dma_disable_half_transfer_interrupt(I2C_TX_DMA, I2C_TX_DMA_CHANNEL); // (BIT 2)
+	dma_enable_transfer_complete_interrupt(I2C_TX_DMA, I2C_TX_DMA_CHANNEL); // (BIT 1)
 
 	// This is the slave address when not transmitting data
 	i2c_set_own_7bit_slave_address(I2C_PORT, 0x32);
 	// do not respond to the specified slave address
 	i2c_disable_ack(I2C_PORT);
+	// Use DMA to send I2C data
+	i2c_enable_dma(I2C_PORT);
 	// set which interrupts I2C uses
 	i2c_enable_interrupt(I2C_PORT, (I2C_CR2_ITEVTEN | I2C_CR2_ITERREN));
 	// APB1 is running at 36MHz = T(PCLK1) = 1/36000000 sec.
@@ -140,34 +157,15 @@ static void setup_i2c_port(enum I2C_FREQ I2C_speed)
 	// set the priorities for the interrupts
 	nvic_set_priority(I2C_EV_IRQ, IRQ_PRI_I2C);
 	nvic_set_priority(I2C_ER_IRQ, IRQ_PRI_ER_I2C);
-	// enable I2C
-	i2c_peripheral_enable(i2c);
-	// enable IRQ
-	nvic_enable_irq(I2C_ER_IRQ);
-	nvic_enable_irq(I2C_EV_IRQ);
-}
-
-static void setup_systick(void)
-{
-	systick_set_frequency(450, 72000000);
-	
-	// Set priority of systic
-	// NOTE: I do not know how this priority pertains to all the others (It was copied out of BlackMagic code))
-	SCB_SHPR(11) &= ~(15 << 4);
-	SCB_SHPR(11) |= IRQ_PRI_SYSTICK;
-	
-	// Start the systick
-	systick_interrupt_enable();
-	systick_counter_enable();
+	nvic_set_priority(I2C_DMA_IRQ, IRQ_PRI_DMA_I2C);
 }
 
 void i2c_led_platform_init(void)
 {
 	// Enable I2C2
 	rcc_periph_clock_enable(RCC_I2C2);
+	rcc_periph_clock_enable(RCC_DMA1);
 
 	// Setup I2C port
 	setup_i2c_port(I2C_400KHz);
-	// Setup systic hardware
-	setup_systick();
 }

@@ -114,7 +114,7 @@
  #define DBG_TOGGLE_PA4()   { gpio_toggle(DEBUG_PORT_A, DEBUG_PA4); }
  #define DBG_USB_ISR()      { gpio_toggle(DEBUG_PORT_A, DEBUG_PA5); }
  #define DBG_I2C_ERR_ISR()  { gpio_toggle(DEBUG_PORT_A, DEBUG_PA6); }
- #define DBG_SYSTIC_ISR()   { gpio_toggle(DEBUG_PORT_A, DEBUG_PA7); }
+ #define DBG_I2C_DMA_ISR()  { gpio_toggle(DEBUG_PORT_A, DEBUG_PA7); }
  #define DBG_I2C_EVT_ISR()  { gpio_toggle(DEBUG_PORT_A, DEBUG_PA9); }
  #define DBG_TIMER_ISR()    { gpio_toggle(DEBUG_PORT_A, DEBUG_PA10); }
 #else
@@ -124,7 +124,7 @@
  #define DBG_TOGGLE_PA4()   { ; }
  #define DBG_USB_ISR()      { ; }
  #define DBG_I2C_ERR_ISR()  { ; }
- #define DBG_SYSTIC_ISR()   { ; }
+ #define DBG_I2C_DMA_ISR()  { ; }
  #define DBG_I2C_EVT_ISR()  { ; }
  #define DBG_TIMER_ISR()    { ; }
 #endif
@@ -133,7 +133,6 @@
 void platform_reset_hardware(void);
 void platform_init(void);
 void platform_delay(uint32_t delay);
-//void assert_boot_pin(void);
 
 
 #ifdef INLINE_GPIO
@@ -153,6 +152,11 @@ inline uint16_t _gpio_get(uint32_t gpioport, uint16_t gpios) {
 }
 #define gpio_get _gpio_get
 #endif /* INLINE_GPIO */
+
+inline uint16_t _gpio_port_write_value(uint32_t gpioport, uint16_t gpios) {
+        return (uint16_t)GPIO_ODR(gpioport) & gpios;
+}
+#define gpio_port_write_value _gpio_port_write_value
 
 
 #endif /* __PLATFORM_STM32F1_H_ */

@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <strings.h>
 
-#include <libopencm3/cm3/cortex.h>
 #include <libopencm3/stm32/gpio.h>
 
 #include <platform.h>
@@ -61,28 +60,26 @@ void io_init(void)
 	}
 }
 
-void get_led_state(uint16_t *led_state)
+void get_led_data(uint32_t *led_data)
 {
-	register uint16_t pin_state;
-	uint16_t port_B;
-	uint16_t port_D;
-
 	// read the value of the input pins
-	pin_state = get_inputs();
-	// read the state of the output ports
-	port_B = GPIO_ODR(OUTPUT_PORT);
-	port_D = GPIO_ODR(LOCKOUT_PORT);
-	// get only the bits we want to display on the LEDs
-	if ((port_D & LOCKOUT_PIN) == LOCKOUT_PIN) {
-		// the outputs are enabled, display them
-		pin_state = ((pin_state & 0x0FFF) | (port_B & (OUTPUT_PORT_PIN1 | OUTPUT_PORT_PIN2 | OUTPUT_PORT_PIN3 | OUTPUT_PORT_PIN4)));
-	}
-	*led_state = pin_state;
+	register uint32_t input_state = (uint32_t)get_inputs();
+	// read the state of the output ports and shift them into position
+	register uint32_t output_state = (uint32_t)get_outputs();
+	// store the led data
+	*led_data = input_state | (output_state << 4);
 }
 
 inline uint16_t get_inputs()
 {
 	return gpio_get(INPUT_PORT, GPIO_ALL);
+}
+
+inline uint16_t get_outputs()
+{
+	return gpio_port_write_value(OUTPUT_PORT,
+		(OUTPUT_PORT_PIN1 | OUTPUT_PORT_PIN2 |
+		OUTPUT_PORT_PIN3 | OUTPUT_PORT_PIN4));
 }
 
 inline uint16_t relays_enabled()
