@@ -3,13 +3,16 @@
 
 /*** Interrupt priorities ***/
 /* Interrupt priorities.  Low numbers are high priority.
- * ((1 << 7) + ?) are assigned to the system interrupts.
+ * ((1 << LEVEL) + SUBLEVEL) are assigned to the system interrupts.
+ * values to use for LEVEL and SUBLEVEL:
+ *      7 >=  LEVEL   >= 4
+ *     15 >= SUBLEVEL >= 0
  */
-#define IRQ_PRI_ER_I2C      (0 << 4)
-#define IRQ_PRI_SYSTICK     (1 << 4)
-#define IRQ_PRI_TIMER       (2 << 4)
-#define IRQ_PRI_I2C         (3 << 4)
-#define IRQ_PRI_USB         (4 << 4)
+#define IRQ_PRI_TIMER       ((1 << 7) + 1)
+#define IRQ_PRI_I2C         ((1 << 6) + 3)
+#define IRQ_PRI_DMA_I2C     ((1 << 6) + 2)
+#define IRQ_PRI_ER_I2C      ((1 << 6) + 1)
+#define IRQ_PRI_USB         ((1 << 4) + 1)
 
 #define USB_1_0_STANDARD 0x0100
 #define USB_1_1_STANDARD 0x0101
