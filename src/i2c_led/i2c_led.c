@@ -45,6 +45,7 @@ void i2c_led_init(void)
 
 void SYSTICK_IRQ(void)
 {
+	DBG_SYSTIC_ISR();
 	static uint8_t row_index = 0;
 	uint16_t led_status;
 	uint8_t i2c_value;
@@ -73,12 +74,15 @@ void SYSTICK_IRQ(void)
 	i2c_peripheral_enable(I2C2);
 	// start sending the I2C message
 	i2c_send_start(I2C2);
+	DBG_SYSTIC_ISR();
 }
 
 void I2C_EVENT_IRQ(void)
 {
 	uint32_t reg32_sr1;
 	uint8_t data;
+
+	DBG_I2C_EVT_ISR();
 
 	// read Status Register
 	reg32_sr1 = I2C_SR1(I2C2);
@@ -105,10 +109,13 @@ void I2C_EVENT_IRQ(void)
 		nvic_disable_irq(I2C_ER_IRQ);
 		nvic_disable_irq(I2C_EV_IRQ);
 	}
+	DBG_I2C_EVT_ISR();
 }
 
 void I2C_ERROR_IRQ(void)
 {
+	DBG_I2C_ERR_ISR();
 	reset_i2c_pins();
 	device_PCA8574D_init(I2C_PORT);
+	DBG_I2C_ERR_ISR();
 }

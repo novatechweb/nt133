@@ -97,17 +97,36 @@
 #define UNUSED_PORTB_PIN7 GPIO9
 
 #define DEBUG_PORT_A GPIOA
-#define DEBUG_PIN_1  UNUSED_PORTA_PIN1
-#define DEBUG_PIN_2  UNUSED_PORTA_PIN2
+#define DEBUG_PA1    GPIO1
+#define DEBUG_PA2    GPIO2
+#define DEBUG_PA3    GPIO3
+#define DEBUG_PA4    GPIO4
+#define DEBUG_PA5    GPIO5
+#define DEBUG_PA6    GPIO6
+#define DEBUG_PA7    GPIO7
+#define DEBUG_PA9    GPIO9
+#define DEBUG_PA10   GPIO10
 
 #ifdef DEBUG
- #define DBG_TIMER_TICK() { gpio_toggle(DEBUG_PORT_A, DEBUG_PIN_1); }
- #define DBG_TOGGLE_1() { gpio_toggle(DEBUG_PORT_A, DEBUG_PIN_1); }
- #define DBG_TOGGLE_2() { gpio_toggle(DEBUG_PORT_A, DEBUG_PIN_2); }
+ #define DBG_TOGGLE_PA1()   { gpio_toggle(DEBUG_PORT_A, DEBUG_PA1); }
+ #define DBG_TOGGLE_PA2()   { gpio_toggle(DEBUG_PORT_A, DEBUG_PA2); }
+ #define DBG_TOGGLE_PA3()   { gpio_toggle(DEBUG_PORT_A, DEBUG_PA3); }
+ #define DBG_TOGGLE_PA4()   { gpio_toggle(DEBUG_PORT_A, DEBUG_PA4); }
+ #define DBG_USB_ISR()      { gpio_toggle(DEBUG_PORT_A, DEBUG_PA5); }
+ #define DBG_I2C_ERR_ISR()  { gpio_toggle(DEBUG_PORT_A, DEBUG_PA6); }
+ #define DBG_SYSTIC_ISR()   { gpio_toggle(DEBUG_PORT_A, DEBUG_PA7); }
+ #define DBG_I2C_EVT_ISR()  { gpio_toggle(DEBUG_PORT_A, DEBUG_PA9); }
+ #define DBG_TIMER_ISR()    { gpio_toggle(DEBUG_PORT_A, DEBUG_PA10); }
 #else
- #define DBG_TIMER_TICK() { ; }
- #define DBG_TOGGLE_1() { ; }
- #define DBG_TOGGLE_2() { ; }
+ #define DBG_TOGGLE_PA1()   { ; }
+ #define DBG_TOGGLE_PA2()   { ; }
+ #define DBG_TOGGLE_PA3()   { ; }
+ #define DBG_TOGGLE_PA4()   { ; }
+ #define DBG_USB_ISR()      { ; }
+ #define DBG_I2C_ERR_ISR()  { ; }
+ #define DBG_SYSTIC_ISR()   { ; }
+ #define DBG_I2C_EVT_ISR()  { ; }
+ #define DBG_TIMER_ISR()    { ; }
 #endif
 
 

@@ -274,10 +274,12 @@ void usb_reenumerate(void)
 
 void USB_ISR(void)
 {
+	DBG_USB_ISR();
 	// disable USB until the interrupt request has been handled
 	nvic_disable_irq(USB_IRQ);
 	// flag that there is at least one USB interrupt that needs handled
 	usb_interrupt_flag = true;
+	DBG_USB_ISR();
 }
 
 inline void poll_usb(void)

@@ -35,7 +35,7 @@ uint32_t tick_counter = 0;
 void NT_TIMER_IRQ(void)
 {
 	uint8_t timer_index;
-	DBG_TIMER_TICK();
+	DBG_TIMER_ISR();
 	// just a counter to know that this interrupt has been serviced
 	tick_counter++;
 	CLEAR_NT_TIMER_FLAG();
@@ -66,6 +66,7 @@ void NT_TIMER_IRQ(void)
 			cm_enable_interrupts();
 		}
 	}
+	DBG_TIMER_ISR();
 }
 
 // ***************************************************************************
