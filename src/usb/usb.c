@@ -13,7 +13,7 @@
 #include <io.h>
 #include "usb.h"
 
-#define BOARD_IDENT "NovaTech Input & Output ["BUILDDATE"]"
+#define BOARD_IDENT "NovaTech Input & Output"
 #define INTERFACE_STRING "Input/Output control"
 
 #define SERIALNO_FLASH_LOCATION	0x8001ff0

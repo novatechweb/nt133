@@ -1,5 +1,4 @@
 PROGRAM := nt133
-BUILDDATE := `date +"%Y%m%d"`
 VERSION_MAJOR := 0x00
 VERSION_MINOR := 0x01
 
@@ -17,7 +16,6 @@ CFLAGS += \
 	-Wno-pointer-sign \
 	-Wno-char-subscripts\
 	-Wno-sign-compare \
-	-DBUILDDATE=\"$(BUILDDATE)\" \
 	-DVERSION_MAJOR=$(VERSION_MAJOR) \
 	-DVERSION_MINOR=$(VERSION_MINOR) \
 	-I../libopencm3/include \
