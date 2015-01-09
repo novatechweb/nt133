@@ -100,6 +100,8 @@ static const char *usb_strings[] = {
 // Global handle to USB device data structure
 usbd_device * global_usb_dev_handle;
 
+// Global flag stating the host is requesting information
+bool usb_host_available = false;
 // Global flag for the main loop to state that USB needs to be handled
 bool usb_interrupt_flag = false;
 
@@ -124,6 +126,11 @@ uint16_t usb_set_interrupt_data(uint16_t pin_state)
 	// store the current state of the pins
 	interrupt_pending_buffer[0] = pin_state >> 8;
 	interrupt_pending_buffer[1] = pin_state & 0xFF;
+
+	if (usb_host_available == false) {
+		// the host is not ready to request information from the endpoints
+		return true;
+	}
 	// set the data to be sent
 	return usbd_ep_write_packet(global_usb_dev_handle, EP_ADDR_INTERRUPT, interrupt_pending_buffer, INTERRUPT_DATA_BUFF_LEN);
 }
@@ -248,6 +255,9 @@ static void set_config(usbd_device *usbd_dev, uint16_t UNUSED(wValue))
 		USB_REQ_TYPE_VENDOR,
 		USB_REQ_TYPE_DIRECTION | USB_REQ_TYPE_TYPE,
 		set_output_enable_control_callback);
+
+	// the host is available and will be requesting the endpoints
+	usb_host_available = true;
 }
 
 void usb_reenumerate(void)
@@ -264,6 +274,8 @@ void usb_reenumerate(void)
 	usbd_register_set_config_callback(global_usb_dev_handle, set_config);
 	// specify there isn't any usb interrupts that need handaling
 	usb_interrupt_flag = false;
+	// can not load buffers untill the host is ready
+	usb_host_available = false;
 	// set ISR priority
 	nvic_set_priority(USB_IRQ, IRQ_PRI_USB);
 	// enable interrupt
