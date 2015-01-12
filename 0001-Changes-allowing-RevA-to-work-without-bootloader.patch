@@ -1,0 +1,132 @@
+From 031cc89689d38e08840309604c8c76658b3cec7a Mon Sep 17 00:00:00 2001
+From: "Joseph A. Lutz" <joseph.lutz@novatechweb.com>
+Date: Mon, 12 Jan 2015 11:41:19 -0600
+Subject: [PATCH] Changes allowing RevA to work without bootloader
+
+---
+ src/Makefile          |  4 ++--
+ src/i2c_led/i2c_led.c | 24 ++++++++++++++++++++++++
+ src/usb/usb.c         |  6 ++++++
+ 3 files changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/src/Makefile b/src/Makefile
+index 40ef73c..81ee3d5 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -31,8 +31,8 @@ LDFLAGS += \
+ 	-L../libopencm3/lib \
+ 
+ # uncomment the next two lines to use the USB_DFU bootloader
+-CFLAGS += -DBOOTLOADER
+-LDFLAGS += -Wl,-Ttext=0x8002000 -Wl,--defsym,_stack=0x20005000
++#CFLAGS += -DBOOTLOADER
++#LDFLAGS += -Wl,-Ttext=0x8002000 -Wl,--defsym,_stack=0x20005000
+ 
+ # uncomment if debugging code should be included
+ #CFLAGS += -DDEBUG
+diff --git a/src/i2c_led/i2c_led.c b/src/i2c_led/i2c_led.c
+index c954868..80e6afd 100644
+--- a/src/i2c_led/i2c_led.c
++++ b/src/i2c_led/i2c_led.c
+@@ -10,6 +10,8 @@
+ #include <io.h>
+ #include "i2c_led.h"
+ 
++#define REV_A_BOARD
++
+ // Address for the IO expander that controlls the LEDs
+ #define PCA8575PW_7BIT_ADDRESS (0x40 >> 1)
+ 
+@@ -18,8 +20,12 @@ const uint8_t row_data_table[] = {
+ 	0x7e, // 0b01111110
+ 	0x7d, // 0b01111101
+ 	0x7b, // 0b01111011
++#ifndef REV_A_BOARD
++	0x07, // 0b11110111
++#else
+ 	0x6f, // 0b01101111
+ 	0x5f, // 0b01011111
++#endif
+ };
+ // Table used to translate from led_data to the byte send to the I2C LEDs
+ const uint8_t translate_table[] = {
+@@ -45,8 +51,10 @@ const uint8_t translate_table[] = {
+ // Data sent on the next I2C command
+ enum {
+ 	COL_DATA_OFF,
++#ifndef REV_A_BOARD
+ 	ROW_DATA_OFF,
+ 	COL_DATA,
++#endif
+ 	ROW_DATA,
+ 	I2C_DMA_BUFF_LEN,
+ };
+@@ -96,6 +104,16 @@ static void start_i2c_message(struct timer_handle_t * UNUSED(cur_timer_handle))
+ 	nibble_index = ((nibble_index + 1) % sizeof(row_data_table));
+ 	// get the state of the inputs
+ 	get_led_data(&led_data);
++#ifdef REV_A_BOARD
++	// show the output status of the outputs and not the output sence
++	led_data = (led_data & 0xFFF) | ((led_data & 0xF0000) >> 4);
++	// get the nibble to be displayed on the LEDs
++	temp_col_data = (uint8_t)(led_data >> (nibble_index * 4)) & 0xF;
++
++	i2c_tx_dma_buff[ROW_DATA] =
++		(translate_table[temp_col_data] & 0x0F) |
++		(row_data_table[nibble_index] & 0x0F) << 4;
++#else
+ 	// get the nibble to be displayed on the LEDs
+ 	temp_col_data = (uint8_t)(led_data >> (nibble_index * 4)) & 0xF;
+ 	// Use the translate_table to convert the data for the I2C LEDs
+@@ -103,6 +121,7 @@ static void start_i2c_message(struct timer_handle_t * UNUSED(cur_timer_handle))
+ 	i2c_tx_dma_buff[COL_DATA] = translate_table[temp_col_data];
+ 	// Select which ROW will be displayed
+ 	i2c_tx_dma_buff[ROW_DATA] = row_data_table[nibble_index];
++#endif
+ 
+ 	// ***  Setup DMA of the data to send  ***
+ 	// set: Source, Destination, and Amount (DMA channel must be disabled)
+@@ -203,10 +222,15 @@ void i2c_led_init(void)
+ 	i2c_led_platform_init();
+ 	i2c_state = I2C_idle;
+ 	// initilize I2C TX DMA buffer
++#ifdef REV_A_BOARD
++	i2c_tx_dma_buff[COL_DATA_OFF] = 0xFF;
++	i2c_tx_dma_buff[ROW_DATA] = 0xFF;
++#else
+ 	i2c_tx_dma_buff[COL_DATA_OFF] = 0x1F;
+ 	i2c_tx_dma_buff[ROW_DATA_OFF] = 0xFF;
+ 	i2c_tx_dma_buff[COL_DATA] = translate_table[0];
+ 	i2c_tx_dma_buff[ROW_DATA] = row_data_table[0];
++#endif
+ 	// Initilize I2C timer
+ 	remove_timer(&i2c_timer);
+ 	INIT_TIMER_HANDLE(i2c_timer, I2C_TIMER_TIME, true, start_i2c_message, NULL);
+diff --git a/src/usb/usb.c b/src/usb/usb.c
+index 7aac933..9b2624a 100644
+--- a/src/usb/usb.c
++++ b/src/usb/usb.c
+@@ -16,6 +16,8 @@
+ #define BOARD_IDENT "NovaTech Input & Output"
+ #define INTERFACE_STRING "Input/Output control"
+ 
++#define REV_A_BOARD
++
+ #define SERIALNO_FLASH_LOCATION	0x8001ff0
+ 
+ #define NT133_USB_REQ_INPUT_STATUS 0x10
+@@ -93,7 +95,11 @@ const struct usb_config_descriptor config = {
+ static const char *usb_strings[] = {
+ 	"NovaTech LLC",
+ 	BOARD_IDENT,
++#ifdef REV_A_BOARD
++	"133000000000000",
++#else
+ 	(char *)SERIALNO_FLASH_LOCATION,
++#endif
+ 	INTERFACE_STRING,
+ };
+ 
+-- 
+2.1.3
+
