@@ -98,12 +98,7 @@ int main(int UNUSED(argc), char **UNUSED(argv))
         bin_in_data[bin_in_index].quality = local_pps_quality;
         bin_in_data[bin_in_index].pin_state = pin_state;
         
-        if (++bin_in_index < PPS_TICKS_BUFFER_DEPTH)
-            ;
-        else
-            bin_in_index = 0;
-        
-              
+             
         //NEW_CODE: Used for debug only, used to trigger oscilloscope
         //gpio_clear(GPIOA,GPIO8);
         
@@ -116,6 +111,12 @@ int main(int UNUSED(argc), char **UNUSED(argv))
         #else   //NEW_CODE: below is the modified code to put ts info out to usb
         if (usb_set_interrupt_data(bin_in_data[bin_in_index])) 
             prev_pin_state = pin_state;
+
+
+        if (++bin_in_index < PPS_TICKS_BUFFER_DEPTH)
+            ;
+        else
+            bin_in_index = 0;
         #endif
      }   // end of while (1)
 
