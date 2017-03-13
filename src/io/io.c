@@ -31,7 +31,20 @@ struct output_t output[] = {
 		.port = OUTPUT_PORT,
 		.pin = OUTPUT_PORT_PIN4,
 		.enable = false,
+	}, {
+		.port = GPIOB,
+		.pin = GPIO12,
+		.enable = true,
+	}, {
+		.port = GPIOA,
+		.pin = GPIO9,
+		.enable = true,
+	}, {
+		.port = GPIOA,
+		.pin = GPIO8,
+		.enable = true,
 	}
+
 };
 #define NUM_OUTPUTS (sizeof(output)/sizeof(struct output_t))
 
@@ -70,10 +83,34 @@ void get_led_data(uint32_t *led_data)
 	*led_data = input_state | (output_state << 4);
 }
 
+
+#if 0
 inline uint16_t get_inputs()
 {
 	return gpio_get(INPUT_PORT, GPIO_ALL);
 }
+#else //sagazio
+inline uint16_t get_inputs()
+{
+	uint16_t s1, s2, s3, s4;
+	//uint16_t ledPort;
+	
+	s1 = gpio_get(GPIOA, GPIO6 | GPIO7);                 //in1, 2
+	s1 = s1 >> 6;
+	s1 |= (gpio_get(GPIOB, GPIO0 | GPIO1) << 2);		 //in3, 4
+
+	s2 = (gpio_get(GPIOB,GPIO6 | GPIO7 | GPIO8 | GPIO9) >> 6);  //in5, 6, 7, 8
+
+	s3 = gpio_get(GPIOA, GPIO0 | GPIO1 | GPIO2 | GPIO3);   //in9, 10, 11, 12
+	s4 = (gpio_get(GPIOC, GPIO6 | GPIO7 | GPIO8 | GPIO9) >> 6);   //in13,14, 15, 16
+
+
+	//ledPort = (s4 << 12) | (s3 << 8) | (s2 << 4) | s1;
+
+    return ((s4 << 12) | (s3 << 8) | (s2 << 4) | s1);
+}
+#endif
+
 
 inline uint16_t get_outputs()
 {

@@ -16,4 +16,6 @@ void disable_relays();
 bool set_output(uint8_t output_index, bool enable, usec_time_t msec_time);
 usec_time_t get_timer_remaining(uint8_t output_index);
 
+#define RNGN0	4	//NEW_CODE: , index for binary input range control 
+
 #endif /* __IO_H_ */
