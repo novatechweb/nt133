@@ -8,7 +8,7 @@
 
 #include <platform.h>
 #include "nt_timer.h"
-
+#include "io/io.h"      //NEW_CODE: Added to support new i/o board
 
 // * * * * *   D E F I N I T I O N S  * * * * *
 
@@ -26,6 +26,21 @@ struct timer_handle_t* timer_list[MAX_TIMERS];
 // a counter that increments each NT_Timer tick
 uint32_t tick_counter = 0;
 
+//NEW_CODE: Added to support new i/o board
+volatile uint32_t us125_tick_counter = 0; 
+uint32_t prev_us125_tick_counter = 0; 
+
+volatile uint32_t seconds_tick_counter = 0;
+uint32_t arrl = TICKS_PER_125_MICRO_SEC;
+uint32_t prev_arrl = TICKS_PER_125_MICRO_SEC;
+
+
+enum arr_states tc = IDLE;
+enum pps_status pps_quality = BAD;
+
+
+void tweak_arrl (void);
+//NEW_CODE: End
 
 // ***************************************************************************
 // * Description: Interupt service routine for tne NT_Timer                  *
@@ -41,7 +56,8 @@ void NT_TIMER_IRQ(void)
 	CLEAR_NT_TIMER_FLAG();
 	// I do not want to block all interrupts while looping through the timer_list
 	// therefore, all calls in this file should only happen in the main loop.
-
+            
+ 
 	for (timer_index=0; timer_index<MAX_TIMERS; timer_index++) {
 		if (timer_list[timer_index] == NULL) {
 			// Timer is not allocated. skip to next
@@ -62,6 +78,8 @@ void NT_TIMER_IRQ(void)
 			cm_enable_interrupts();
 		}
 	}
+	
+	
 	DBG_TIMER_ISR();
 }
 
@@ -132,13 +150,16 @@ void initialize_timer(void)
 	uint8_t timer_index;
 	
 	nt_timer_platform_init();
-
+        
 	DISABLE_NT_TIMER_INT();
 	// All timers are disabled
 	for (timer_index=0; timer_index<MAX_TIMERS; timer_index++) {
 		timer_list[timer_index] = NULL;
 	}
 	ENABLE_NT_TIMER_INT();
+        
+        //NEW_CODE: Added to support new i/o board
+        tim1_init_pps_timer();
 }
 
 // ***************************************************************************
@@ -205,3 +226,138 @@ bool timer_started(struct timer_handle_t *handle)
 	}
 	return false;
 }
+
+
+//NEW_CODE: Added to support new i/o board
+// ***************************************************************************
+// * Function: void PPS_UP_IRQ (void)                                        *
+// * Description: Serviced every 10us.  Used to increment a counter needed   *                                                            *
+// *    to track the elapsed time from the last rising edge of the 1 pps     *
+// *    input.  Counter is also used to detect if there were any missed pps  *
+// *    signals and to synchronize the TIM1 and the 1pps input.              *
+// * Inputs: None                                                            *
+// * Returns: None                                                           *
+// * Caveats: May not be needed when a 32 bit ticker is utilized.            *                                                               *
+// ***************************************************************************
+void PPS_UP_IRQ (void)
+{
+    //NEW_CODE: Used for debug only, used to trigger oscilloscope
+    gpio_set(GPIOA,GPIO8);
+
+    if (++us125_tick_counter > PPS_TICKS+PPS_TICK_SLOP)
+    {
+		//if we landed in here we missed a pps edge		
+		seconds_tick_counter++;
+        us125_tick_counter = 0;
+        
+		pps_quality = BAD;  
+    }
+      
+    //NEW_CODE: Used for debug only, used to trigger oscilloscope
+    gpio_clear(GPIOA,GPIO8);
+
+    timer_clear_flag(TIM1,TIM_SR_UIF);
+}
+
+// ***************************************************************************
+// * Function: void PPS_CC_IRQ (void)                                        *
+// * Description: Serviced on every rising edge of the 1 pps input.          * 
+// *    us125_tick_counter represents the number of 125uS interrupts per     *
+// *    rising of the pps signal as a correction factor for synchronization. *
+// * Inputs: None                                                            *
+// * Returns: None                                                           *
+// * Caveats:                                                                *
+// ***************************************************************************
+void PPS_CC_IRQ (void)
+{
+	DISABLE_TIM1_2();
+
+	//tweak_arrl();
+	pps_quality = GOOD;
+
+    
+    us125_tick_counter = 0;
+    seconds_tick_counter = 0;
+    
+    timer_set_counter(TIM1, 0); 
+    timer_clear_flag(TIM1,TIM_SR_CC1IF|TIM_SR_CC2IF|TIM_SR_CC3IF|TIM_SR_CC4IF);
+	
+    ENABLE_TIM1_2();
+ }
+
+
+// ***************************************************************************
+// * Function: void tweak_arrl (void)                                        *
+// * Description: Called every rising edge of the 1 pps input.  Used to      *
+// *              drift of the pps input.  When pps_avg moves above or below *
+// *              PPS_TICKS, the auto-reload parameter (arrl) is ajusted.    *
+// *              timer_set_period(TIM1,arrl) is the period of how often     *
+// *              PPS_UP_IRQ is called.                                      *
+// * Inputs: None                                                            *
+// * Returns: None                                                           *
+// * Caveats: Slow to update when a needed tweak is more of a bump.          *
+// *************************************************************************** 
+void tweak_arrl (void)
+{
+    #define SLOP    10
+	uint32_t tick_count;
+
+	/*
+	 * tc (throttle control) is used as a state machine variable where its purpose
+	 * is to control oscillations.  Meaning don't continually speed up and slow
+	 * down.  The idea is to rest in the idle state for at least one seconds time.
+	 *
+	 * An improvment could be to move arrl (auto-reload register) in proportion to
+	 * how far out pps_avg is from its ideal value of PPS_TICKS but in the event 
+	 * that it's really far out there I didn't want to smack it with too large a club.
+	 * All at once that is, move it gently.
+	 */
+
+	tick_count = us125_tick_counter;
+	switch (tc)
+	{
+		case IDLE:
+    		if ((tick_count >= PPS_TICKS-SLOP) &&      
+        		(tick_count <= PPS_TICKS+SLOP)) 
+				;
+			else if (tick_count < PPS_TICKS-SLOP)  
+				tc = FAST;
+			else
+				tc = SLOW;
+		break;
+
+		case SLOW:
+			if (tick_count > PPS_TICKS+SLOP)
+            	arrl += 1; // collecting too many ticks, running too slow 
+            	 		   // meaning the period of pps input is too long
+			tc = IDLE;
+		break;
+
+		case FAST:
+			if (tick_count < PPS_TICKS+SLOP)
+            	arrl -= 1; // not collecting enough ticks, running too fast 
+            	 		   // meaning the period of pps input is too short
+			tc = IDLE;
+		break;
+
+		default:
+			tc = IDLE;
+	}
+         
+    if (prev_arrl != arrl)
+    {
+        //re-adjust period of interrupt
+        prev_arrl = arrl;
+        timer_set_period(TIM1,arrl);
+    }
+}
+
+//NEW_CODE: End
+
+
+
+
+
+
+
+

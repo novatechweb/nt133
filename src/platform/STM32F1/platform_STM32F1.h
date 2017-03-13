@@ -107,6 +107,7 @@
 #define DEBUG_PA9    GPIO9
 #define DEBUG_PA10   GPIO10
 
+
 #ifdef DEBUG
  #define DBG_TOGGLE_PA1()   { gpio_toggle(DEBUG_PORT_A, DEBUG_PA1); }
  #define DBG_TOGGLE_PA2()   { gpio_toggle(DEBUG_PORT_A, DEBUG_PA2); }
@@ -116,7 +117,7 @@
  #define DBG_I2C_ERR_ISR()  { gpio_toggle(DEBUG_PORT_A, DEBUG_PA6); }
  #define DBG_I2C_DMA_ISR()  { gpio_toggle(DEBUG_PORT_A, DEBUG_PA7); }
  #define DBG_I2C_EVT_ISR()  { gpio_toggle(DEBUG_PORT_A, DEBUG_PA9); }
- #define DBG_TIMER_ISR()    { gpio_toggle(DEBUG_PORT_A, DEBUG_PA10); }
+ #define DBG_TIMER_ISR()    { gpio_toggle(DEBUG_PORT_A, DEBUG_PA10); } 
 #else
  #define DBG_TOGGLE_PA1()   { ; }
  #define DBG_TOGGLE_PA2()   { ; }
@@ -126,7 +127,7 @@
  #define DBG_I2C_ERR_ISR()  { ; }
  #define DBG_I2C_DMA_ISR()  { ; }
  #define DBG_I2C_EVT_ISR()  { ; }
- #define DBG_TIMER_ISR()    { ; }
+ #define DBG_TIMER_ISR()    { ; }  
 #endif
 
 

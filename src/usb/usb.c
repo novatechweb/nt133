@@ -93,7 +93,15 @@ const struct usb_config_descriptor config = {
 static const char *usb_strings[] = {
 	"NovaTech LLC",
 	BOARD_IDENT,
-	(char *)SERIALNO_FLASH_LOCATION,
+	//(char *)SERIALNO_FLASH_LOCATION,  --> sagazio//NEW_CODE: 
+	
+    #if 0		//#ifdef	REV_A_BOARD
+	   "133000000000000",
+    #else
+     	(char *)SERIALNO_FLASH_LOCATION,
+    #endif
+
+
 	INTERFACE_STRING,
 };
 
@@ -113,26 +121,32 @@ uint8_t inputs_data_buffer[INPUTS_DATA_BUFF_LEN];
 // buffer used to send the values of the input ports back to the host
 uint8_t timer_remaining_data_buffer[TIMER_REMAINING_DATA_BUFF_LEN];
 
-
+//NEW_CODE: Added to support new i/o board, added timestamp parameters to argument list for usb transport
+#if 0
+uint16_t usb_set_interrupt_data(binary_input_event bin_in_data)
+#else
 uint16_t usb_set_interrupt_data(uint16_t pin_state)
+#endif
 {
-	// NOTE:        interrupt_pending_buffer[]
-	// The first two bytes of interrupt_pending_buffer hold the state of input pins
-	//   interrupt_pending_buffer[0] == input pins 16, 15, 14, 13, 12, 11, 10, 09
-	//   interrupt_pending_buffer[1] == input pins 08, 07 ,06 ,05 ,04 ,03 ,02 ,01
+    // NOTE:    interrupt_pending_buffer[]
+    // The first two bytes of interrupt_pending_buffer hold the state of input pins
+    //   interrupt_pending_buffer[0] == input pins 16, 15, 14, 13, 12, 11, 10, 09
+    //   interrupt_pending_buffer[1] == input pins 08, 07 ,06 ,05 ,04 ,03 ,02 ,01
 
-	// buffer holding the data for interrupt endpoint
-	uint8_t interrupt_pending_buffer[INTERRUPT_DATA_BUFF_LEN];
-	// store the current state of the pins
-	interrupt_pending_buffer[0] = pin_state >> 8;
-	interrupt_pending_buffer[1] = pin_state & 0xFF;
-
-	if (usb_host_available == false) {
-		// the host is not ready to request information from the endpoints
-		return true;
-	}
-	// set the data to be sent
-	return usbd_ep_write_packet(global_usb_dev_handle, EP_ADDR_INTERRUPT, interrupt_pending_buffer, INTERRUPT_DATA_BUFF_LEN);
+    // buffer holding the data for interrupt endpoint
+    uint8_t interrupt_pending_buffer[INTERRUPT_DATA_BUFF_LEN]; 
+    // store the current state of the pins
+    interrupt_pending_buffer[0] = pin_state >> 8;
+    interrupt_pending_buffer[1] = pin_state & 0xFF;
+    
+    
+    if (usb_host_available == false) {
+        // the host is not ready to request information from the endpoints
+        return true;
+    }
+    
+    // set the data to be sent
+    return usbd_ep_write_packet(global_usb_dev_handle, EP_ADDR_INTERRUPT, interrupt_pending_buffer, INTERRUPT_DATA_BUFF_LEN);
 }
 
 static int get_inputs_control_callback(usbd_device * UNUSED(usbd_dev),
@@ -160,6 +174,15 @@ static int set_output_control_callback(usbd_device * UNUSED(usbd_dev),
 	uint32_t timeout;
 	uint8_t *buff = *buf;
 
+    //NEW_CODE: Added to support new i/o board, toggle input threshold range control bit
+	if (req->wIndex == RNGN0)
+	{												  //pulse width
+		if (set_output(RNGN0, (req->wValue & 0x0001), (req->wValue >> 1)))
+			return USBD_REQ_HANDLED;
+	}
+	//NEW_CODE: End
+
+
 	if (req->bRequest != NT133_USB_REQ_OUTPUT_CTRL) {
 		// not handling any other request other than NT133_USB_REQ_OUTPUT_CTRL
 		return USBD_REQ_NEXT_CALLBACK;
@@ -173,6 +196,7 @@ static int set_output_control_callback(usbd_device * UNUSED(usbd_dev),
 		return USBD_REQ_NOTSUPP;
 	}
 
+	#if 1	
 	// calculate the timeout value from the data
 	timeout = (buff[0] * 16777216) + (buff[1] * 65536) + (buff[2] * 256) + buff[3];
 
@@ -180,6 +204,11 @@ static int set_output_control_callback(usbd_device * UNUSED(usbd_dev),
 	if (set_output(req->wIndex, ((req->wValue == 0) ? false : true), timeout)) {
 		return USBD_REQ_HANDLED;
 	}
+    #else //NEW_CODE: this was the only way I could figure out how the pulse width work, i know it's wrong
+	if (set_output(req->wIndex, (req->wValue & 0x0001), (req->wValue >> 1))) {
+		return USBD_REQ_HANDLED;
+	}
+	#endif
 
 	// error occured while trying to set the outputs
 	return USBD_REQ_NOTSUPP;
@@ -189,7 +218,7 @@ static int get_output_timer_control_callback(usbd_device * UNUSED(usbd_dev),
 	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
 	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req) __attribute__((unused)))
 {
-	usec_time_t timer_remaining;
+	volatile usec_time_t timer_remaining;
 	if (req->bRequest != NT133_USB_REQ_OUTPUT_STATUS) {
 		// not handling any other request other than NT133_USB_REQ_OUTPUT_STATUS
 		return USBD_REQ_NEXT_CALLBACK;

@@ -13,6 +13,8 @@
 #define IRQ_PRI_DMA_I2C     ((1 << 6) + 2)
 #define IRQ_PRI_ER_I2C      ((1 << 6) + 1)
 #define IRQ_PRI_USB         ((1 << 4) + 1)
+#define IRQ_PRI_PPS_CC		((1 << 4) + 2)	//NEW_CODE:
+#define IRQ_PRI_PPS_UP		((1 << 4) + 3)	//NEW_CODE:
 
 #define USB_1_0_STANDARD 0x0100
 #define USB_1_1_STANDARD 0x0101

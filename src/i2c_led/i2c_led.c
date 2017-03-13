@@ -61,63 +61,106 @@ enum I2C_STATE {
 enum I2C_STATE i2c_state = I2C_idle;
 
 // Time (in 100's on microseconds) between the start of each I2C message
-#define I2C_TIMER_TIME 33
+#define I2C_TIMER_TIME 33	// NEW_CODE   demo value ---> 1500
 // Timer handler for starting the I2C message
 struct timer_handle_t i2c_timer;
 
 static void start_i2c_message(struct timer_handle_t * UNUSED(cur_timer_handle))
 {
-	static uint8_t nibble_index = 0;
+    //NEW_CODE: Added to support new i/o board
+    //Disabled code is from existing i/o board
+	//There's nothing wrong with the existing code, the new hardware no longer 
+	//has a matrix LED so we no longer use row, col notation.
+	//Also COL_DATA, ROW_DATA should maybe be renamed, I left it alone since
+	//we may have a common code base or the matrix led makes a come back.
+    #if 0	
+        static uint8_t nibble_index = 0;
 	uint32_t led_data;
 	uint8_t temp_col_data;
+    #else   
+        uint16_t led_data = 0; //NEW_CODE: 
+    #endif
+         
+    // Disable interrupts for the hardware
+    DISABLE_I2C_INTERRUPT();
+    if (i2c_state == I2C_error) {
+        // Reset the I2C hardware
+        i2c_led_reset_hardware();
+        // setup the I2C hardware and state
+        i2c_led_init();
+        return;
+    } else if (i2c_state != I2C_idle) {
+        // Something went wrong with the I2C state
+        // I2C will get reset
+        i2c_state = I2C_error;
+        // send the stop bit
+        i2c_send_stop(I2C_PORT);
+        return;
+    }
+    
+    // Disable the I2C hardware
+    i2c_peripheral_disable(I2C_PORT);
+    dma_disable_channel(I2C_TX_DMA, I2C_TX_DMA_CHANNEL);
 
-	// Disable interrupts for the hardware
-	DISABLE_I2C_INTERRUPT();
-	if (i2c_state == I2C_error) {
-		// Reset the I2C hardware
-		i2c_led_reset_hardware();
-		// setup the I2C hardware and state
-		i2c_led_init();
-		return;
-	} else if (i2c_state != I2C_idle) {
-		// Something went wrong with the I2C state
-		// I2C will get reset
-		i2c_state = I2C_error;
-		// send the stop bit
-		i2c_send_stop(I2C_PORT);
-		return;
-	}
-	// Disable the I2C hardware
-	i2c_peripheral_disable(I2C_PORT);
-	dma_disable_channel(I2C_TX_DMA, I2C_TX_DMA_CHANNEL);
-
-	// ***  Get the data to send  ***
-	// increment to the next nibble
-	nibble_index = ((nibble_index + 1) % sizeof(row_data_table));
-	// get the state of the inputs
+    // ***  Get the data to send  ***
+    // increment to the next nibble
+    //nibble_index = ((nibble_index + 1) % sizeof(row_data_table));
+    // get the state of the inputs
+	
+    //NEW_CODE: Added to support new i/o board
+    // Disabled code is from existing i/o board
+    #if 0
 	get_led_data(&led_data);
-	// get the nibble to be displayed on the LEDs
-	temp_col_data = (uint8_t)(led_data >> (nibble_index * 4)) & 0xF;
-	// Use the translate_table to convert the data for the I2C LEDs
-	// (reverses the bit order so input 1 is on the top and not the bottom)
-	i2c_tx_dma_buff[COL_DATA] = translate_table[temp_col_data];
-	// Select which ROW will be displayed
-	i2c_tx_dma_buff[ROW_DATA] = row_data_table[nibble_index];
+    #else
+        led_data = get_inputs(); 
+    #endif
 
-	// ***  Setup DMA of the data to send  ***
-	// set: Source, Destination, and Amount (DMA channel must be disabled)
-	dma_set_peripheral_address(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, (uint32_t)&I2C_DR(I2C_PORT));
-	dma_set_memory_address(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, (uint32_t)i2c_tx_dma_buff);
-	dma_set_number_of_data(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, (uint16_t)I2C_DMA_BUFF_LEN);
 
-	// ***  Start sending the message  ***
-	i2c_state = I2C_running;
-	// enable interrupts
-	ENABLE_I2C_INTERRUPT();
-	// enable I2C hardware
-	i2c_peripheral_enable(I2C_PORT);
-	// sending the I2C start
-	i2c_send_start(I2C_PORT);
+    // get the nibble to be displayed on the LEDs
+    // temp_col_data = (uint8_t)(led_data >> (nibble_index * 4)) & 0xF;
+    // Use the translate_table to convert the data for the I2C LEDs
+    // (reverses the bit order so input 1 is on the top and not the bottom)
+	
+
+    // NEW_CODE ROW_DATA LED 16 - 08 
+    // NEW_CODE COL_DATA LED 07 - 00
+    // Card B --> LED 05, 11 = 0x0410
+    //if (led_data == 0x0000)
+    //	led_data = 1;
+
+	//NEW_CODE: Used for foolish marketing demo	
+    // card b: (05,11) led_data = 0x0410;
+    // card d: (07,14) led_data = 0x2040;
+    // card c: (11) led_data = 0x0400;
+    // card a: no leds led_data = 0x0000;
+	
+    //NEW_CODE: Added to support new i/o board
+    // Disabled code is from existing i/o board
+    #if 0    
+        i2c_tx_dma_buff[COL_DATA] = translate_table[temp_col_data];
+        // Select which ROW will be displayed
+        i2c_tx_dma_buff[ROW_DATA] = row_data_table[nibble_index];
+    #else
+        i2c_tx_dma_buff[COL_DATA] = ~(led_data & 0x00ff); //translate_table[temp_col_data];
+        i2c_tx_dma_buff[ROW_DATA] = ~((led_data & 0xff00) >> 8);
+        i2c_tx_dma_buff[COL_DATA_OFF] = 0xff;
+        i2c_tx_dma_buff[ROW_DATA_OFF] = 0xff;
+    #endif
+
+    // ***  Setup DMA of the data to send  ***
+    // set: Source, Destination, and Amount (DMA channel must be disabled)
+    dma_set_peripheral_address(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, (uint32_t)&I2C_DR(I2C_PORT));
+    dma_set_memory_address(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, (uint32_t)i2c_tx_dma_buff);
+    dma_set_number_of_data(I2C_TX_DMA, I2C_TX_DMA_CHANNEL, (uint16_t)I2C_DMA_BUFF_LEN);
+
+    // ***  Start sending the message  ***
+    i2c_state = I2C_running;
+    // enable interrupts
+    ENABLE_I2C_INTERRUPT();
+    // enable I2C hardware
+    i2c_peripheral_enable(I2C_PORT);
+    // sending the I2C start
+    i2c_send_start(I2C_PORT);
 }
 
 void I2C_EVENT_ISR(void)
@@ -205,8 +248,10 @@ void i2c_led_init(void)
 	// initilize I2C TX DMA buffer
 	i2c_tx_dma_buff[COL_DATA_OFF] = 0x1F;
 	i2c_tx_dma_buff[ROW_DATA_OFF] = 0xFF;
-	i2c_tx_dma_buff[COL_DATA] = translate_table[0];
-	i2c_tx_dma_buff[ROW_DATA] = row_data_table[0];
+
+	//NEW_CODE: 
+	i2c_tx_dma_buff[COL_DATA] = 0x00; //translate_table[0];
+	i2c_tx_dma_buff[ROW_DATA] = 0x00; //row_data_table[0];
 	// Initilize I2C timer
 	remove_timer(&i2c_timer);
 	INIT_TIMER_HANDLE(i2c_timer, I2C_TIMER_TIME, true, start_i2c_message, NULL);
